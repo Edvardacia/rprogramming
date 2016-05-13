@@ -1,0 +1,71 @@
+library("NLRoot")
+## Black - Scholes Function
+BS <- 
+  function(S, K, T, r, sig, type = "C") {
+    d1 <- (log(S/K) + T*(r + 0.5*sig*sig)) / (sig*sqrt(T))
+    
+    if(type == "C"){
+      value <- S*pnorm(d1) - exp(-r*T) * K * pnorm(d1 - sig * sqrt(T))
+    }
+    if(type == "P"){
+      value <- (S*pnorm(d1) - exp(-r*T) * K * pnorm(d1 - sig * sqrt(T))) - S + K * exp(-r * T)
+    }
+    return(value)
+  }
+
+implied.vol <-
+  function(Price_option, Strike, Price_contract, Time_exp) {
+    delta <- 10000000000
+    T = Time_exp/366
+    best_sigma <- 0
+    
+    for (i in seq(0.001, 0.999, by = 0.001)) {
+      d1 <- (log(Price_contract / Strike) + i * i * T / 2) / (i * sqrt(T))
+      d2 <- d1 - i*sqrt(T)
+      d1 <- pnorm(d1)
+      d2 <- pnorm(d2)
+      OC <- Price_contract * d1 - Strike * d2
+      raz <- abs(Price_option - OC)
+      if (raz < delta) {
+        delta = raz
+        best_sigma = i
+      }
+    }
+    return(best_sigma)
+}
+
+dat <- read.csv("SPX_data.csv", sep = ";")
+n <- dim(dat)[1]
+Strike <- rep(0, n)
+st.P0.Bid <- dat$st.P0.Bid
+st.P0.Ask <- dat$st.P0.Ask
+st.P1.Bid <- dat$st.P1.Bid
+st.Price <- dat$Price
+st.Strike <- dat$Strike
+st0.vol.Bid <- rep(0, n)
+st0.vol.Ask <- rep(0, n)
+st1.vol.Bid <- rep(0, n)
+
+for (i in 1:n){
+  st0.vol.Bid[i] <- implied.vol(st.P0.Bid[i], st.Strike[i], st.Price[i], 28)
+  st0.vol.Ask[i] <- implied.vol(st.P0.Ask[i], st.Strike[i], st.Price[i], 28)
+  st1.vol.Bid[i] <- implied.vol(st.P1.Bid[i], st.Strike[i], st.Price[i], 28)
+  }
+
+st0.vol.Bid
+st0.vol.Ask
+st1.vol.Bid
+
+plot(st.Strike, st0.vol.Bid, xlab = "Страйк", ylab = "Волатильность", main = "Улыбка волатильности по Блэк-Шоулз", type = "o", pch = 21, cex = 1.2, bg = "red", lwd = 2, col.main = "blue")
+abline(2048, col="red", lty=2)
+
+dfx <- data.frame(ev1=st.Strike, ev2=st1.vol.Bid, ev3=n:1)
+with(dfx, symbols(x=ev1, y=ev2, circles=ev3, inches=1/3, ann=F, bg="steelblue2", fg=NULL))
+
+for (i in 1:n){
+  points(st.Strike[i], st1.vol.Bid[i])
+}
+
+library(aplpack)
+
+bagplot(st.Strike, st0.vol.Bid, xlab = "Страйк", ylab = "Волатильность", main = "Улыбка волатильности по Блэк-Шоулз")
